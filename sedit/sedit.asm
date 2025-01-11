@@ -10,6 +10,11 @@ windowTitle db "SEdit | Debug Edition", 0
 errorFormat db "%s", 0xa, 0
 hello db "HEllo world!", 0xa, 0
 
+section .bss
+
+currentRect resd 4
+currentRectColor resd 3
+
 section .text
 global Start
 
@@ -23,6 +28,7 @@ extern SDL_RenderPresent
 extern SDL_PollEvent
 extern SDL_DestroyRenderer
 extern SDL_DestroyWindow
+extern SDL_RenderFillRect
 extern SDL_Quit
 extern ExitProcess
 extern printf
@@ -58,7 +64,7 @@ createWindow:
   ; SDL_SetRenderDrawColor(renderer, 20, 10, 10)
   mov rcx, [renderer]
   mov edx, 20
-  mov r8d, 10
+  mov r8d, 50
   mov r9d, 10
   call SDL_SetRenderDrawColor
 
@@ -71,8 +77,7 @@ createWindow:
   call SDL_RenderPresent
 
   add rsp, 48
-
-  jmp gameLoop
+  jmp appLoop
 
 sdlInitFailed:
   mov rcx, sdlInitFailedText
@@ -84,11 +89,23 @@ createSDLWindowFailed:
   call printf
   ret
 
-gameLoop:
-  sdlPoll:
-    ; mov rcx, hello
-    ; call printf
+drawRect:
+  ; SDL_SetRenderDrawColor(renderer, 255, 255, 255)
+  mov rcx, [renderer]
+  mov edx, [currentRectColor+0]
+  mov r8d, [currentRectColor+4]
+  mov r9d, [currentRectColor+8]
+  call SDL_SetRenderDrawColor
 
+  ; SDL_RenderFillRect(renderer, &rect)
+  mov rcx, [renderer]
+  lea rdx, [currentRect]
+  call SDL_RenderFillRect
+
+  ret
+
+appLoop:
+  sdlPoll:
     ; SDL_PollEvent(&event)
     lea rcx, event
     call SDL_PollEvent
@@ -106,7 +123,7 @@ gameLoop:
   ; SDL_SetRenderDrawColor(renderer, 20, 10, 10)
   mov rcx, [renderer]
   mov edx, 20
-  mov r8d, 10
+  mov r8d, 50
   mov r9d, 10
   call SDL_SetRenderDrawColor
 
@@ -114,11 +131,31 @@ gameLoop:
   mov rcx, [renderer]
   call SDL_RenderClear
 
+  ; rendering
+
+  ; set rectangle color
+  mov dword [currentRectColor+0], 200
+  mov dword [currentRectColor+4], 0
+  mov dword [currentRectColor+8], 200
+
+  mov dword [currentRect+0], 10 ; x
+  mov dword [currentRect+4], 10 ; y
+  mov dword [currentRect+8], 100 ; w
+  mov dword [currentRect+12], 100 ; h
+  call drawRect
+
+  mov dword [currentRectColor+8], 0
+  mov dword [currentRect+0], 300 ; x
+  mov dword [currentRect+4], 300 ; y
+  mov dword [currentRect+8], 200 ; w
+  mov dword [currentRect+12], 200 ; h
+  call drawRect
+
   ; SDL_RenderPresent(renderer)
   mov rcx, [renderer]
   call SDL_RenderPresent
 
-  jmp gameLoop
+  jmp appLoop
 
 quitWindow:
   ; SDL_DestroyRenderer(renderer)
