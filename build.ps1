@@ -58,6 +58,6 @@ Write-Host -ForegroundColor "blue" "Assembling..."
 nasm -fwin64 sedit\sedit.asm -o build\sedit.obj
 
 Write-Host -ForegroundColor "blue" "Linking..."
-$null = GoLink build\sedit.obj /console build\SDL2.dll msvcrt.dll kernel32.dll
+$null = GoLink build\sedit.obj /console build\SDL2.dll build\SDL2_ttf.dll msvcrt.dll kernel32.dll
 
 Write-Host -ForegroundColor "green" "Build finished!"

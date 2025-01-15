@@ -6,21 +6,31 @@ window dq 1
 event db 56
 windowFailedText db "An error occurred. Failed to create an SDL2 window.", 0xa, 0
 sdlInitFailedText db "An error occurred. Failed to initialize SDL2.", 0xa, 0
+ttfInitFailedText db "An error occurred. Failed to initialize SDL2_ttf.", 0xa, 0
 windowTitle db "SEdit | Debug Edition", 0
 errorFormat db "%s", 0xa, 0
 hello db "HEllo world!", 0xa, 0
+fontFilePath db "..\resources\fonts\sourcecodepro\SourceCodePro-Regular.ttf"
 
 section .bss
 
 currentRect resd 4
 currentRectColor resd 3
+codeFont resq 1
+fontColor resd 1
 
 section .text
+
 global Start
 
 extern SDL_Init
+extern TTF_Init
 extern SDL_CreateWindow
-extern SDL_GetErrors
+extern SDL_GetError
+extern TTF_OpenFont
+extern TTF_RenderText_Blended
+extern SDL_CreateTextureFromSurface
+extern SDL_FreeSurface
 extern SDL_CreateRenderer
 extern SDL_SetRenderDrawColor
 extern SDL_RenderClear
@@ -38,6 +48,9 @@ createWindow:
   call SDL_Init
   test eax, eax
   js sdlInitFailed
+
+  call TTF_Init
+  js ttfInitFailed
 
   sub rsp, 48
 
@@ -61,11 +74,11 @@ createWindow:
   call SDL_CreateRenderer
   mov [renderer], rax
 
-  ; SDL_SetRenderDrawColor(renderer, 20, 10, 10)
+  ; SDL_SetRenderDrawColor(renderer, 0, 0, 0)
   mov rcx, [renderer]
-  mov edx, 20
-  mov r8d, 50
-  mov r9d, 10
+  mov edx, 0
+  mov r8d, 0
+  mov r9d, 0
   call SDL_SetRenderDrawColor
 
   ; SDL_RenderClear(renderer)
@@ -77,6 +90,8 @@ createWindow:
   call SDL_RenderPresent
 
   add rsp, 48
+
+  call initApp
   jmp appLoop
 
 sdlInitFailed:
@@ -84,9 +99,52 @@ sdlInitFailed:
   call printf
   ret
 
+ttfInitFailed:
+  mov rcx, ttfInitFailedText
+  call printf
+  ret
+
 createSDLWindowFailed:
   mov rcx, windowFailedText
   call printf
+  ret
+
+initFonts:
+  ; TTF_OpenFont(filepath, 16 [size]);
+  mov rcx, fontFilePath
+  mov edx, 16
+  call TTF_OpenFont
+  mov [codeFont], rax
+  ret
+
+renderText:
+  ; set to white for now
+  ; FIXME
+  ; SDL_Color {255, 255, 255}
+  mov dword [fontColor+0], 255
+  mov dword [fontColor+4], 255
+  mov dword [fontColor+8], 255
+
+  ; the font is already in rcx because of the callee
+  ; the text is already in rdx
+  ; TTF_RenderText_Blended(font, text, fontColor)
+  mov rcx, codeFont
+  mov rdx, [hello]
+  mov r8d, fontColor
+  call TTF_RenderText_Blended
+  mov rdi, [rax] ; save the SDL_Surface to free it
+
+  ; convert SDL_Surface into SDL_Texture
+  ; SDL_CreateTextureFromSurface(renderer, rax [surface])
+  mov rcx, [renderer]
+  mov rdx, [rax]
+  call SDL_CreateTextureFromSurface
+
+  ; free the surface
+  ; SDL_FreeSurface(&rdi [surface])
+  mov rcx, [rdi]
+  call SDL_FreeSurface
+
   ret
 
 drawRect:
@@ -102,6 +160,10 @@ drawRect:
   lea rdx, [currentRect]
   call SDL_RenderFillRect
 
+  ret
+
+initApp:
+  call initFonts
   ret
 
 appLoop:
@@ -120,11 +182,11 @@ appLoop:
 
   ; clear the screen
 
-  ; SDL_SetRenderDrawColor(renderer, 20, 10, 10)
+  ; SDL_SetRenderDrawColor(renderer, 0, 0, 0)
   mov rcx, [renderer]
-  mov edx, 20
-  mov r8d, 50
-  mov r9d, 10
+  mov edx, 0
+  mov r8d, 0
+  mov r9d, 0
   call SDL_SetRenderDrawColor
 
   ; SDL_RenderClear(renderer)
@@ -135,7 +197,7 @@ appLoop:
 
   ; set rectangle color
   mov dword [currentRectColor+0], 200
-  mov dword [currentRectColor+4], 0
+  mov dword [currentRectColor+4], 200
   mov dword [currentRectColor+8], 200
 
   mov dword [currentRect+0], 10 ; x
@@ -144,12 +206,12 @@ appLoop:
   mov dword [currentRect+12], 100 ; h
   call drawRect
 
-  mov dword [currentRectColor+8], 0
-  mov dword [currentRect+0], 300 ; x
-  mov dword [currentRect+4], 300 ; y
-  mov dword [currentRect+8], 200 ; w
-  mov dword [currentRect+12], 200 ; h
-  call drawRect
+  ; render some text
+  mov rcx, sdlInitFailedText
+  call printf
+  mov rcx, [codeFont]
+  mov rdx, [hello]
+  call renderText
 
   ; SDL_RenderPresent(renderer)
   mov rcx, [renderer]
